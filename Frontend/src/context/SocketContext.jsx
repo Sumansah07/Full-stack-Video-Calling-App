@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useAuth } from "./AuthProvider";
 import io from "socket.io-client";
+import { API_BASE_URL } from "../utils/api";
 
 const socketContext = createContext();
 
@@ -16,7 +17,7 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     if (authUser) {
-      const newSocket = io("https://full-stack-video-calling-app.onrender.com", {
+      const newSocket = io(API_BASE_URL, {
         query: {
           userId: authUser.user._id,
         },
