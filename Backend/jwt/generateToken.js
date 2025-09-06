@@ -6,8 +6,10 @@ const createTokenAndSaveCookie = (userId, res) => {
   });
   res.cookie("jwt", token, {
     httpOnly: true, // xss
-    secure: true,
-    sameSite: "strict", // csrf
+    secure: process.env.NODE_ENV === "production", // Only secure in production
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "strict", // Allow cross-site in production
+    domain: process.env.NODE_ENV === "production" ? undefined : undefined, // Let browser handle domain
   });
+  return token; // Return token so it can be included in response
 };
 export default createTokenAndSaveCookie;

@@ -10,8 +10,20 @@ function Logout() {
   const handleLogout = async () => {
     setLoading(true);
     try {
-      const res = await axios.post(getApiUrl("api/user/logout"));
+      // Get token for authentication
+      let token = Cookies.get("jwt");
+      if (!token) {
+        token = localStorage.getItem("jwt");
+      }
+      
+      const res = await axios.post(getApiUrl("api/user/logout"), {}, {
+        withCredentials: true,
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
       localStorage.removeItem("ChatApp");
+      localStorage.removeItem("jwt");
       Cookies.remove("jwt");
       setLoading(false);
       toast.success("Logged out successfully");

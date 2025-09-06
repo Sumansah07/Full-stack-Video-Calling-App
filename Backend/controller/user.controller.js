@@ -20,7 +20,7 @@ export const signup = async (req, res) => {
     });
     await newUser.save();
     if (newUser) {
-      createTokenAndSaveCookie(newUser._id, res);
+      const token = createTokenAndSaveCookie(newUser._id, res);
       res.status(201).json({
         message: "User created successfully",
         user: {
@@ -28,6 +28,7 @@ export const signup = async (req, res) => {
           fullname: newUser.fullname,
           email: newUser.email,
         },
+        token: token,
       });
     }
   } catch (error) {
@@ -43,7 +44,7 @@ export const login = async (req, res) => {
     if (!user || !isMatch) {
       return res.status(400).json({ error: "Invalid user credential" });
     }
-    createTokenAndSaveCookie(user._id, res);
+    const token = createTokenAndSaveCookie(user._id, res);
     res.status(201).json({
       message: "User logged in successfully",
       user: {
@@ -51,6 +52,7 @@ export const login = async (req, res) => {
         fullname: user.fullname,
         email: user.email,
       },
+      token: token,
     });
   } catch (error) {
     console.log(error);

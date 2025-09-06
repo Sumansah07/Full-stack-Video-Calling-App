@@ -13,11 +13,16 @@ function useGetAllUsers() {
     const getUsers = async () => {
       setLoading(true);
       try {
-        const token = Cookies.get("jwt");
+        // Try to get token from cookies first, then from localStorage
+        let token = Cookies.get("jwt");
+        if (!token) {
+          token = localStorage.getItem("jwt");
+        }
+        
         const response = await axios.get(getApiUrl("api/user/allusers"), {
-          credentials: "include",
+          withCredentials: true,
           headers: {
-            Authorization: `Bearer ${token}`,
+            ...(token && { Authorization: `Bearer ${token}` }),
           },
         });
 

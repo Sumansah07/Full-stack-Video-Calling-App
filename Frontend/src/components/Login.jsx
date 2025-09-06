@@ -26,8 +26,12 @@ function Login() {
       .then((response) => {
         if (response.data) {
           toast.success("Login successful");
+          // Store both user data and token
+          localStorage.setItem("ChatApp", JSON.stringify(response.data));
+          if (response.data.token) {
+            localStorage.setItem("jwt", response.data.token);
+          }
         }
-        localStorage.setItem("ChatApp", JSON.stringify(response.data));
         setAuthUser(response.data);
       })
       .catch((error) => {

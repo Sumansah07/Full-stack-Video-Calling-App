@@ -35,8 +35,11 @@ function Signup() {
       .then((response) => {
         if (response.data) {
           toast.success("Signup successful");
+          localStorage.setItem("ChatApp", JSON.stringify(response.data));
+          if (response.data.token) {
+            localStorage.setItem("jwt", response.data.token);
+          }
         }
-        localStorage.setItem("ChatApp", JSON.stringify(response.data));
         setAuthUser(response.data);
       })
       .catch((error) => {
