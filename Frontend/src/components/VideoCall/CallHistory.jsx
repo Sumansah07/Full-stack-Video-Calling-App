@@ -41,7 +41,7 @@ const CallHistory = ({ isOpen, onClose }) => {
       }
 
       const response = await axios.get(
-        `http://localhost:4002/api/call/history?${params}`,
+        `/api/call/history?${params}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`

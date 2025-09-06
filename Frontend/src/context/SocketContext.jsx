@@ -16,18 +16,18 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     if (authUser) {
-      const newSocket = io("http://localhost:4002", {
+      const newSocket = io("https://full-stack-video-calling-app.onrender.com", {
         query: {
           userId: authUser.user._id,
         },
       });
-      
+
       setSocket(newSocket);
-      
+
       newSocket.on("getOnlineUsers", (users) => {
         setOnlineUsers(users);
       });
-      
+
       return () => {
         newSocket.close();
       };
@@ -39,7 +39,7 @@ export const SocketProvider = ({ children }) => {
       }
     }
   }, [authUser]);
-  
+
   return (
     <socketContext.Provider value={{ socket, onlineUsers }}>
       {children}

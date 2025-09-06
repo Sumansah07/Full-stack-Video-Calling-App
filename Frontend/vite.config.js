@@ -8,8 +8,9 @@ export default defineConfig({
     port: 3001,
     proxy: {
       "/api": {
-        target: "http://localhost:4002",
+        target: "https://full-stack-video-calling-app.onrender.com",
         changeOrigin: true,
+        secure: true,
       },
     },
   },
