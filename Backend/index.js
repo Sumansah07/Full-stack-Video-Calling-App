@@ -15,8 +15,13 @@ dotenv.config();
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: ["http://localhost:3001", "http://localhost:3000", "http://localhost:5173"],
-  credentials: true
+    origin: [
+        "http://localhost:3001",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://full-stack-video-calling-app.vercel.app"
+    ],
+    credentials: true
 }));
 
 const PORT = process.env.PORT || 3001;
