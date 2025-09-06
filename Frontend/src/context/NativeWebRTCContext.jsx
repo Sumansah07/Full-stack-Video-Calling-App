@@ -85,12 +85,30 @@ export const WebRTCProvider = ({ children }) => {
         }
       };
 
-      // Handle remote stream
+      // Handle remote stream - FIXED for bidirectional audio
       pc.ontrack = (event) => {
+        console.log('Received remote track:', event.track.kind, event.track.enabled);
         const [stream] = event.streams;
-        setRemoteStream(stream);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = stream;
+        
+        // Ensure we have a proper remote stream
+        if (stream) {
+          setRemoteStream(stream);
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = stream;
+            // Ensure remote video is NOT muted and can play audio
+            remoteVideoRef.current.muted = false;
+            // Force play to ensure audio works
+            remoteVideoRef.current.play().catch(e => {
+              console.log('Auto-play prevented, user interaction required');
+            });
+          }
+          
+          // Ensure audio tracks are enabled and playing
+          const audioTracks = stream.getAudioTracks();
+          audioTracks.forEach(track => {
+            console.log('Remote audio track:', track.id, 'enabled:', track.enabled);
+            track.enabled = true; // Ensure audio track is enabled
+          });
         }
       };
 
@@ -219,6 +237,24 @@ export const WebRTCProvider = ({ children }) => {
         }
       });
 
+      // Handle peer audio/video toggle events
+      socket.on('peer-audio-toggled', (data) => {
+        console.log('Peer audio toggled:', data.muted);
+        // You can show UI indicators here if needed
+      });
+
+      socket.on('peer-video-toggled', (data) => {
+        console.log('Peer video toggled:', data.videoOff);
+        // You can show UI indicators here if needed
+      });
+
+      // Handle peer disconnection
+      socket.on('peer-disconnected', (data) => {
+        console.log('Peer disconnected:', data.userId);
+        toast.warning('Peer disconnected');
+        endCall();
+      });
+
       return () => {
         // Clean up event listeners
         socket.off('incoming-call');
@@ -227,6 +263,9 @@ export const WebRTCProvider = ({ children }) => {
         socket.off('call-started');
         socket.off('call-ended');
         socket.off('ice-candidate');
+        socket.off('peer-audio-toggled');
+        socket.off('peer-video-toggled');
+        socket.off('peer-disconnected');
       };
     }
   }, [socket, peerConnection, callRoom]);
@@ -235,9 +274,19 @@ export const WebRTCProvider = ({ children }) => {
   const getUserMedia = async (constraints = { video: true, audio: true }) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      // Ensure audio tracks are properly configured
+      const audioTracks = stream.getAudioTracks();
+      audioTracks.forEach(track => {
+        console.log('Local audio track created:', track.id, 'enabled:', track.enabled);
+        track.enabled = true; // Ensure audio is enabled by default
+      });
+      
       setLocalStream(stream);
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
+        // Ensure local video is muted to prevent feedback
+        localVideoRef.current.muted = true;
       }
       return stream;
     } catch (error) {
@@ -258,23 +307,37 @@ export const WebRTCProvider = ({ children }) => {
         throw new Error('User not authenticated');
       }
 
-      // Get user media
+      // Get user media with explicit audio constraints
       const stream = await getUserMedia({
         video: callType === 'video',
-        audio: true
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 44100
+        }
       });
 
       // Create peer connection
       const pc = createPeerConnection();
       setPeerConnection(pc);
 
-      // Add local stream to peer connection
+      // Add local stream to peer connection with proper track handling
       stream.getTracks().forEach(track => {
+        console.log('Adding local track:', track.kind, track.enabled);
+        // Ensure audio track is enabled
+        if (track.kind === 'audio') {
+          track.enabled = true;
+        }
         pc.addTrack(track, stream);
       });
 
-      // Create offer
-      const offer = await pc.createOffer();
+      // Create offer with proper audio/video constraints
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: callType === 'video',
+        voiceActivityDetection: false
+      });
       await pc.setLocalDescription(offer);
 
       // Send call request
@@ -322,10 +385,15 @@ export const WebRTCProvider = ({ children }) => {
 
     if (accept) {
       try {
-        // Get user media
+        // Get user media with explicit audio constraints
         const stream = await getUserMedia({
           video: incomingCallData.callType === 'video',
-          audio: true
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 44100
+          }
         });
 
         // Create peer connection
@@ -336,16 +404,25 @@ export const WebRTCProvider = ({ children }) => {
         setCallRoom(incomingCallData.roomId);
         sendPendingIceCandidates(incomingCallData.roomId);
 
-        // Add local stream
+        // Add local stream with proper track handling
         stream.getTracks().forEach(track => {
+          console.log('Adding local track (answerer):', track.kind, track.enabled);
+          // Ensure audio track is enabled
+          if (track.kind === 'audio') {
+            track.enabled = true;
+          }
           pc.addTrack(track, stream);
         });
 
         // Set remote description (offer)
         await pc.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer));
 
-        // Create answer
-        const answer = await pc.createAnswer();
+        // Create answer with proper constraints
+        const answer = await pc.createAnswer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: incomingCallData.callType === 'video',
+          voiceActivityDetection: false
+        });
         await pc.setLocalDescription(answer);
 
         // Send answer

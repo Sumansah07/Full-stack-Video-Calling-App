@@ -79,6 +79,9 @@ io.on("connection", async (socket) => {
     
     const receiverSocket = users[to];
     if (receiverSocket) {
+      // Join caller to room immediately for ICE candidate exchange
+      socket.join(roomId);
+      
       io.to(receiverSocket).emit("incoming-call", {
         from,
         to,
@@ -157,7 +160,8 @@ io.on("connection", async (socket) => {
   // Handle ICE candidates
   socket.on("ice-candidate", (data) => {
     const { roomId, candidate } = data;
-    socket.to(roomId).emit("ice-candidate", { candidate });
+    // Broadcast to all other users in the room
+    socket.to(roomId).emit("ice-candidate", { candidate, roomId });
   });
   
   // End call
