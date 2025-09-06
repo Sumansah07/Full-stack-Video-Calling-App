@@ -103,8 +103,23 @@ const VideoCallInterface = () => {
           </div>
         )}
 
-        {/* Local Video (Picture-in-Picture) */}
-        <div className="absolute top-4 right-20 w-48 h-32 bg-gray-800 rounded-lg overflow-hidden border-2 border-white shadow-lg">
+        {/* Debug Info - Mobile Responsive */}
+        <div className="absolute top-16 left-4 md:top-20 md:right-4 md:left-auto bg-black bg-opacity-70 text-white p-2 rounded text-xs max-w-xs">
+          <div>Local: {localStream ? '✅' : '❌'}</div>
+          <div>Remote: {remoteStream ? '✅' : '❌'}</div>
+          <div>Audio: {isAudioEnabled ? '🔊' : '🔇'}</div>
+          <div>Video: {isVideoEnabled ? '📹' : '📷'}</div>
+          <div>Status: {connectionState}</div>
+          {localStream && (
+            <div>
+              <div>A: {localStream.getAudioTracks().length}</div>
+              <div>V: {localStream.getVideoTracks().length}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Local Video (Picture-in-Picture) - Mobile Responsive */}
+        <div className="absolute top-4 right-4 w-32 h-24 md:w-48 md:h-32 bg-gray-800 rounded-lg overflow-hidden border-2 border-white shadow-lg">
           <video
             ref={localVideoRef}
             autoPlay
@@ -114,7 +129,7 @@ const VideoCallInterface = () => {
           />
           {!isVideoEnabled && (
             <div className="absolute inset-0 bg-gray-700 flex items-center justify-center">
-              <FaVideoSlash className="text-white text-2xl" />
+              <FaVideoSlash className="text-white text-xl md:text-2xl" />
             </div>
           )}
         </div>
@@ -133,85 +148,85 @@ const VideoCallInterface = () => {
             showControls ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          <div className="bg-gradient-to-t from-black via-black/50 to-transparent p-6">
-            <div className="flex justify-center items-center space-x-4">
+          <div className="bg-gradient-to-t from-black via-black/50 to-transparent p-4 md:p-6">
+            <div className="flex justify-center items-center space-x-2 md:space-x-4">
               {/* Audio Toggle */}
               <button
                 onClick={toggleAudio}
-                className={`p-4 rounded-full transition-colors ${
+                className={`p-3 md:p-4 rounded-full transition-colors ${
                   isAudioEnabled 
                     ? 'bg-gray-700 hover:bg-gray-600 text-white' 
                     : 'bg-red-500 hover:bg-red-600 text-white'
                 }`}
                 title={isAudioEnabled ? 'Mute' : 'Unmute'}
               >
-                {isAudioEnabled ? <FaMicrophone size={20} /> : <FaMicrophoneSlash size={20} />}
+                {isAudioEnabled ? <FaMicrophone size={16} className="md:w-5 md:h-5" /> : <FaMicrophoneSlash size={16} className="md:w-5 md:h-5" />}
               </button>
 
               {/* Video Toggle */}
               <button
                 onClick={toggleVideo}
-                className={`p-4 rounded-full transition-colors ${
+                className={`p-3 md:p-4 rounded-full transition-colors ${
                   isVideoEnabled 
                     ? 'bg-gray-700 hover:bg-gray-600 text-white' 
                     : 'bg-red-500 hover:bg-red-600 text-white'
                 }`}
                 title={isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
               >
-                {isVideoEnabled ? <FaVideo size={20} /> : <FaVideoSlash size={20} />}
+                {isVideoEnabled ? <FaVideo size={16} className="md:w-5 md:h-5" /> : <FaVideoSlash size={16} className="md:w-5 md:h-5" />}
               </button>
 
-              {/* Screen Share Toggle */}
+              {/* Screen Share Toggle - Hidden on mobile */}
               <button
                 onClick={isScreenSharing ? stopScreenShare : startScreenShare}
-                className={`p-4 rounded-full transition-colors ${
+                className={`hidden md:block p-3 md:p-4 rounded-full transition-colors ${
                   isScreenSharing 
                     ? 'bg-green-500 hover:bg-green-600 text-white' 
                     : 'bg-gray-700 hover:bg-gray-600 text-white'
                 }`}
                 title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
               >
-                {isScreenSharing ? <MdStopScreenShare size={20} /> : <MdScreenShare size={20} />}
+                {isScreenSharing ? <MdStopScreenShare size={16} className="md:w-5 md:h-5" /> : <MdScreenShare size={16} className="md:w-5 md:h-5" />}
               </button>
 
-              {/* Chat Toggle */}
+              {/* Chat Toggle - Hidden on mobile */}
               <button
                 onClick={() => setShowChat(!showChat)}
-                className={`p-4 rounded-full transition-colors ${
+                className={`hidden md:block p-3 md:p-4 rounded-full transition-colors ${
                   showChat 
                     ? 'bg-blue-500 hover:bg-blue-600 text-white' 
                     : 'bg-gray-700 hover:bg-gray-600 text-white'
                 }`}
                 title="Toggle chat"
               >
-                <FaComment size={20} />
+                <FaComment size={16} className="md:w-5 md:h-5" />
               </button>
 
-              {/* Settings */}
+              {/* Settings - Hidden on mobile */}
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                className="p-4 bg-gray-700 hover:bg-gray-600 text-white rounded-full transition-colors"
+                className="hidden md:block p-3 md:p-4 bg-gray-700 hover:bg-gray-600 text-white rounded-full transition-colors"
                 title="Settings"
               >
-                <FaCog size={20} />
+                <FaCog size={16} className="md:w-5 md:h-5" />
               </button>
 
-              {/* Fullscreen Toggle */}
+              {/* Fullscreen Toggle - Hidden on mobile */}
               <button
                 onClick={toggleFullscreen}
-                className="p-4 bg-gray-700 hover:bg-gray-600 text-white rounded-full transition-colors"
+                className="hidden md:block p-3 md:p-4 bg-gray-700 hover:bg-gray-600 text-white rounded-full transition-colors"
                 title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
               >
-                {isFullscreen ? <FaCompress size={20} /> : <FaExpand size={20} />}
+                {isFullscreen ? <FaCompress size={16} className="md:w-5 md:h-5" /> : <FaExpand size={16} className="md:w-5 md:h-5" />}
               </button>
 
               {/* End Call */}
               <button
                 onClick={endCall}
-                className="p-4 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                className="p-3 md:p-4 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
                 title="End call"
               >
-                <MdCallEnd size={20} />
+                <MdCallEnd size={16} className="md:w-5 md:h-5" />
               </button>
             </div>
           </div>

@@ -12,12 +12,23 @@ function User({ user }) {
   
   // Prioritize socket data over API data for real-time accuracy
   const isOnline = onlineUsers.includes(user._id);
+
+  const handleUserSelect = () => {
+    setSelectedConversation(user);
+    
+    // Auto-close drawer on mobile when user is selected
+    const drawerToggle = document.getElementById('my-drawer-2');
+    if (drawerToggle && window.innerWidth < 1024) { // lg breakpoint
+      drawerToggle.checked = false;
+    }
+  };
+
   return (
     <div
       className={`hover:bg-slate-600 duration-300 ${
         isSelected ? "bg-slate-700" : ""
       }`}
-      onClick={() => setSelectedConversation(user)}
+      onClick={handleUserSelect}
     >
       <div className="flex space-x-4 px-8 py-3 hover:bg-slate-700 duration-300 cursor-pointer">
         <div className={`avatar ${isOnline ? "online" : ""}`}>

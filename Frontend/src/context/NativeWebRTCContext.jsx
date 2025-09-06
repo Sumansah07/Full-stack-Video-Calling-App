@@ -52,6 +52,42 @@ export const WebRTCProvider = ({ children }) => {
     }
   }, [callRoom, socket]);
 
+  // Monitor local stream state
+  useEffect(() => {
+    if (localStream) {
+      console.log('Local stream state changed:', {
+        audioTracks: localStream.getAudioTracks().length,
+        videoTracks: localStream.getVideoTracks().length,
+        active: localStream.active
+      });
+      
+      // Check if stream is still active
+      const checkStreamHealth = () => {
+        if (localStream) {
+          const audioTracks = localStream.getAudioTracks();
+          const videoTracks = localStream.getVideoTracks();
+          
+          audioTracks.forEach(track => {
+            if (track.readyState === 'ended') {
+              console.error('Audio track ended! This will cause one-sided audio.');
+            }
+          });
+          
+          videoTracks.forEach(track => {
+            if (track.readyState === 'ended') {
+              console.error('Video track ended! This will cause one-sided video.');
+            }
+          });
+        }
+      };
+      
+      // Check stream health every 2 seconds during call
+      const healthInterval = setInterval(checkStreamHealth, 2000);
+      
+      return () => clearInterval(healthInterval);
+    }
+  }, [localStream]);
+
   // ICE servers configuration with more STUN servers for better connectivity
   const iceServers = {
     iceServers: [
@@ -85,29 +121,38 @@ export const WebRTCProvider = ({ children }) => {
         }
       };
 
-      // Handle remote stream - FIXED for bidirectional audio
+      // Handle remote stream - CRITICAL FIX for bidirectional audio
       pc.ontrack = (event) => {
-        console.log('Received remote track:', event.track.kind, event.track.enabled);
+        console.log('🎯 RECEIVED REMOTE TRACK:', event.track.kind, 'enabled:', event.track.enabled, 'readyState:', event.track.readyState);
         const [stream] = event.streams;
         
-        // Ensure we have a proper remote stream
         if (stream) {
+          console.log('🎯 Setting remote stream with tracks:', stream.getTracks().map(t => `${t.kind}:${t.enabled}`));
           setRemoteStream(stream);
+          
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = stream;
-            // Ensure remote video is NOT muted and can play audio
-            remoteVideoRef.current.muted = false;
-            // Force play to ensure audio works
-            remoteVideoRef.current.play().catch(e => {
-              console.log('Auto-play prevented, user interaction required');
-            });
+            remoteVideoRef.current.muted = false; // CRITICAL: Remote should NOT be muted
+            
+            // Force play with user interaction handling
+            const playPromise = remoteVideoRef.current.play();
+            if (playPromise !== undefined) {
+              playPromise.catch(e => {
+                console.log('Auto-play prevented, will play on user interaction');
+                // Add click handler to play on user interaction
+                const playOnClick = () => {
+                  remoteVideoRef.current.play();
+                  document.removeEventListener('click', playOnClick);
+                };
+                document.addEventListener('click', playOnClick);
+              });
+            }
           }
           
-          // Ensure audio tracks are enabled and playing
-          const audioTracks = stream.getAudioTracks();
-          audioTracks.forEach(track => {
-            console.log('Remote audio track:', track.id, 'enabled:', track.enabled);
-            track.enabled = true; // Ensure audio track is enabled
+          // Ensure all remote tracks are enabled
+          stream.getTracks().forEach(track => {
+            console.log('🎯 Remote track:', track.kind, 'enabled:', track.enabled, 'readyState:', track.readyState);
+            track.enabled = true;
           });
         }
       };
@@ -195,10 +240,36 @@ export const WebRTCProvider = ({ children }) => {
       socket.on('call-answered', async (data) => {
         if (peerConnection && data.answer) {
           try {
+            console.log('🔥 CALLER: Call answered - setting remote description');
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
             setCallRoom(data.roomId);
             sendPendingIceCandidates(data.roomId);
-            // Don't set isCallActive here - wait for 'call-started' event
+            
+            // CRITICAL FIX: Verify caller's tracks are still active and sending
+            if (localStream && peerConnection) {
+              console.log('🔥 CALLER: Verifying local stream after answer');
+              
+              const senders = peerConnection.getSenders();
+              console.log('🔥 CALLER: Current senders:', senders.length);
+              
+              // Log all current senders
+              senders.forEach((sender, index) => {
+                if (sender.track) {
+                  console.log(`🔥 CALLER: Sender ${index}:`, sender.track.kind, 'enabled:', sender.track.enabled, 'readyState:', sender.track.readyState);
+                } else {
+                  console.log(`🔥 CALLER: Sender ${index}: NO TRACK`);
+                }
+              });
+              
+              // Verify local stream tracks are still active
+              localStream.getTracks().forEach(track => {
+                console.log('🔥 CALLER: Local track status:', track.kind, 'enabled:', track.enabled, 'readyState:', track.readyState);
+                if (track.readyState === 'ended') {
+                  console.error('🔥 CALLER: LOCAL TRACK ENDED! This causes one-sided audio!');
+                }
+              });
+            }
+            
           } catch (error) {
             console.error('Error setting remote description:', error);
             toast.error('Failed to establish connection');
@@ -215,9 +286,31 @@ export const WebRTCProvider = ({ children }) => {
 
       // Call started
       socket.on('call-started', (data) => {
+        console.log('Call started event received, roomId:', data.roomId);
         setIsCallActive(true);
         setCallRoom(data.roomId);
         setIsIncomingCall(false);
+        
+        // Ensure caller's local stream is still active and connected
+        if (localStream && peerConnection) {
+          console.log('Caller: Verifying local stream tracks are still active');
+          const audioTracks = localStream.getAudioTracks();
+          const videoTracks = localStream.getVideoTracks();
+          
+          audioTracks.forEach(track => {
+            console.log('Caller audio track status:', track.id, 'enabled:', track.enabled, 'readyState:', track.readyState);
+            if (track.readyState === 'ended') {
+              console.error('Caller audio track ended unexpectedly!');
+            }
+          });
+          
+          videoTracks.forEach(track => {
+            console.log('Caller video track status:', track.id, 'enabled:', track.enabled, 'readyState:', track.readyState);
+            if (track.readyState === 'ended') {
+              console.error('Caller video track ended unexpectedly!');
+            }
+          });
+        }
       });
 
       // Call ended
@@ -270,28 +363,70 @@ export const WebRTCProvider = ({ children }) => {
     }
   }, [socket, peerConnection, callRoom]);
 
-  // Get user media
+  // Get user media - CRITICAL FIX for persistent streams
   const getUserMedia = async (constraints = { video: true, audio: true }) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('🎤 Requesting user media with constraints:', constraints);
       
-      // Ensure audio tracks are properly configured
-      const audioTracks = stream.getAudioTracks();
-      audioTracks.forEach(track => {
-        console.log('Local audio track created:', track.id, 'enabled:', track.enabled);
-        track.enabled = true; // Ensure audio is enabled by default
+      // CRITICAL FIX: Use more specific constraints to ensure compatibility
+      const enhancedConstraints = {
+        video: constraints.video ? {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        } : false,
+        audio: constraints.audio ? {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } : false
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(enhancedConstraints);
+      
+      console.log('🎤 Got media stream - ID:', stream.id, 'Active:', stream.active);
+      console.log('🎤 Audio tracks:', stream.getAudioTracks().length, 'Video tracks:', stream.getVideoTracks().length);
+      
+      // CRITICAL FIX: Ensure tracks are properly configured and monitored
+      stream.getTracks().forEach(track => {
+        console.log(`🎤 Track: ${track.kind}, ID: ${track.id}, enabled: ${track.enabled}, readyState: ${track.readyState}`);
+        
+        // Ensure track is enabled
+        track.enabled = true;
+        
+        // Add comprehensive event listeners
+        track.addEventListener('ended', () => {
+          console.error(`🚨 ${track.kind.toUpperCase()} TRACK ENDED! This will cause one-sided media!`);
+        });
+        
+        track.addEventListener('mute', () => {
+          console.warn(`🔇 ${track.kind} track muted`);
+        });
+        
+        track.addEventListener('unmute', () => {
+          console.log(`🔊 ${track.kind} track unmuted`);
+        });
       });
       
+      // CRITICAL FIX: Store stream reference and set up monitoring
       setLocalStream(stream);
+      
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
-        // Ensure local video is muted to prevent feedback
-        localVideoRef.current.muted = true;
+        localVideoRef.current.muted = true; // Prevent feedback
+        
+        // Ensure video plays
+        localVideoRef.current.play().catch(e => {
+          console.log('Local video autoplay prevented');
+        });
       }
+      
+      console.log('🎤 Local stream set successfully');
       return stream;
+      
     } catch (error) {
-      console.error('Error accessing media devices:', error);
-      toast.error('Failed to access camera/microphone');
+      console.error('🚨 Error accessing media devices:', error);
+      toast.error('Failed to access camera/microphone: ' + error.message);
       throw error;
     }
   };
@@ -307,38 +442,41 @@ export const WebRTCProvider = ({ children }) => {
         throw new Error('User not authenticated');
       }
 
-      // Get user media with explicit audio constraints
+      console.log('🔥 CALLER: Starting call initiation process');
+
+      // CRITICAL FIX: Get user media FIRST and ensure it's working
       const stream = await getUserMedia({
         video: callType === 'video',
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 44100
-        }
+        audio: true // Simplified - just ensure audio works
       });
 
-      // Create peer connection
+      console.log('🔥 CALLER: Got media stream with tracks:', stream.getTracks().map(t => `${t.kind}:${t.enabled}:${t.readyState}`));
+
+      // CRITICAL FIX: Ensure we have working audio
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        throw new Error('No audio track available');
+      }
+
+      // Create peer connection AFTER we have confirmed working media
       const pc = createPeerConnection();
       setPeerConnection(pc);
 
-      // Add local stream to peer connection with proper track handling
+      // CRITICAL FIX: Add tracks with explicit stream reference
       stream.getTracks().forEach(track => {
-        console.log('Adding local track:', track.kind, track.enabled);
-        // Ensure audio track is enabled
-        if (track.kind === 'audio') {
-          track.enabled = true;
-        }
-        pc.addTrack(track, stream);
+        console.log('🔥 CALLER: Adding track:', track.kind, 'enabled:', track.enabled, 'readyState:', track.readyState);
+        const sender = pc.addTrack(track, stream);
+        console.log('🔥 CALLER: Track added, sender:', !!sender);
       });
 
-      // Create offer with proper audio/video constraints
-      const offer = await pc.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: callType === 'video',
-        voiceActivityDetection: false
-      });
+      // Wait a moment for tracks to be properly added
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Create offer
+      const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
+
+      console.log('🔥 CALLER: Created offer, sending to server');
 
       // Send call request
       socket.emit('call-user', {
@@ -385,18 +523,23 @@ export const WebRTCProvider = ({ children }) => {
 
     if (accept) {
       try {
-        // Get user media with explicit audio constraints
+        console.log('🔥 RECEIVER: Starting call answer process');
+
+        // CRITICAL FIX: Get user media FIRST and ensure it's working
         const stream = await getUserMedia({
           video: incomingCallData.callType === 'video',
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-            sampleRate: 44100
-          }
+          audio: true // Simplified - just ensure audio works
         });
 
-        // Create peer connection
+        console.log('🔥 RECEIVER: Got media stream with tracks:', stream.getTracks().map(t => `${t.kind}:${t.enabled}:${t.readyState}`));
+
+        // CRITICAL FIX: Ensure we have working audio
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length === 0) {
+          throw new Error('No audio track available');
+        }
+
+        // Create peer connection AFTER we have confirmed working media
         const pc = createPeerConnection();
         setPeerConnection(pc);
 
@@ -404,26 +547,24 @@ export const WebRTCProvider = ({ children }) => {
         setCallRoom(incomingCallData.roomId);
         sendPendingIceCandidates(incomingCallData.roomId);
 
-        // Add local stream with proper track handling
-        stream.getTracks().forEach(track => {
-          console.log('Adding local track (answerer):', track.kind, track.enabled);
-          // Ensure audio track is enabled
-          if (track.kind === 'audio') {
-            track.enabled = true;
-          }
-          pc.addTrack(track, stream);
-        });
-
-        // Set remote description (offer)
+        // CRITICAL FIX: Set remote description FIRST (the offer)
         await pc.setRemoteDescription(new RTCSessionDescription(incomingCallData.offer));
+        console.log('🔥 RECEIVER: Set remote description (offer)');
 
-        // Create answer with proper constraints
-        const answer = await pc.createAnswer({
-          offerToReceiveAudio: true,
-          offerToReceiveVideo: incomingCallData.callType === 'video',
-          voiceActivityDetection: false
+        // CRITICAL FIX: Add tracks AFTER setting remote description
+        stream.getTracks().forEach(track => {
+          console.log('🔥 RECEIVER: Adding track:', track.kind, 'enabled:', track.enabled, 'readyState:', track.readyState);
+          const sender = pc.addTrack(track, stream);
+          console.log('🔥 RECEIVER: Track added, sender:', !!sender);
         });
+
+        // Wait a moment for tracks to be properly added
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Create answer
+        const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
+        console.log('🔥 RECEIVER: Created answer and set local description');
 
         // Send answer
         socket?.emit('answer-call', {
@@ -432,9 +573,8 @@ export const WebRTCProvider = ({ children }) => {
           accepted: true
         });
 
+        console.log('🔥 RECEIVER: Sent answer to server');
         setIsIncomingCall(false);
-
-        // Don't set isCallActive here - wait for 'call-started' event
 
       } catch (error) {
         console.error('Error answering call:', error);
@@ -462,31 +602,45 @@ export const WebRTCProvider = ({ children }) => {
 
   // Toggle audio
   const toggleAudio = () => {
+    console.log('Toggle audio called, localStream exists:', !!localStream);
     if (localStream) {
       const audioTrack = localStream.getAudioTracks()[0];
+      console.log('Audio track found:', !!audioTrack, audioTrack ? `enabled: ${audioTrack.enabled}` : 'none');
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setIsAudioEnabled(audioTrack.enabled);
+        console.log('Audio toggled to:', audioTrack.enabled);
         socket?.emit('toggle-audio', {
           roomId: callRoom,
           muted: !audioTrack.enabled
         });
+      } else {
+        console.error('No audio track found in local stream');
       }
+    } else {
+      console.error('No local stream available for audio toggle');
     }
   };
 
   // Toggle video
   const toggleVideo = () => {
+    console.log('Toggle video called, localStream exists:', !!localStream);
     if (localStream) {
       const videoTrack = localStream.getVideoTracks()[0];
+      console.log('Video track found:', !!videoTrack, videoTrack ? `enabled: ${videoTrack.enabled}` : 'none');
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setIsVideoEnabled(videoTrack.enabled);
+        console.log('Video toggled to:', videoTrack.enabled);
         socket?.emit('toggle-video', {
           roomId: callRoom,
           videoOff: !videoTrack.enabled
         });
+      } else {
+        console.error('No video track found in local stream');
       }
+    } else {
+      console.error('No local stream available for video toggle');
     }
   };
 
