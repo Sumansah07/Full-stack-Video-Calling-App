@@ -18,6 +18,12 @@ const secureRoute = async (req, res, next) => {
       return res.status(401).json({ error: "No token, authorization denied" });
     }
     
+    // Validate token format (basic JWT structure check)
+    if (token.split('.').length !== 3) {
+      console.log("Malformed token received:", token.substring(0, 50) + "...");
+      return res.status(401).json({ error: "Malformed token" });
+    }
+    
     const decoded = jwt.verify(token, process.env.JWT_TOKEN);
     if (!decoded) {
       return res.status(401).json({ error: "Invalid Token" });
@@ -32,6 +38,14 @@ const secureRoute = async (req, res, next) => {
     next();
   } catch (error) {
     console.log("Error in secureRoute: ", error);
+    
+    // Handle specific JWT errors
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: "Invalid token format" });
+    } else if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: "Token expired" });
+    }
+    
     res.status(500).json({ error: "Internal server error" });
   }
 };

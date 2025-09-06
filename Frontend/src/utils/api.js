@@ -13,27 +13,24 @@ export const getApiUrl = (endpoint) => {
 // Configure axios defaults
 axios.defaults.withCredentials = true;
 
-// Add request interceptor to include auth token
-axios.interceptors.request.use(
-  (config) => {
-    // Get token from localStorage or cookies
-    let token = localStorage.getItem("jwt");
-    if (!token) {
-      // Try to get from cookies as fallback
-      const cookies = document.cookie.split(';');
-      const jwtCookie = cookies.find(cookie => cookie.trim().startsWith('jwt='));
-      if (jwtCookie) {
-        token = jwtCookie.split('=')[1];
-      }
+// Helper function to get JWT token
+export const getAuthToken = () => {
+  // First try localStorage
+  let token = localStorage.getItem("jwt");
+  
+  // If not found, try cookies (for development)
+  if (!token && typeof document !== 'undefined') {
+    const cookies = document.cookie.split(';');
+    const jwtCookie = cookies.find(cookie => cookie.trim().startsWith('jwt='));
+    if (jwtCookie) {
+      token = jwtCookie.split('=')[1];
     }
-    
-    if (token && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
   }
-);
+  
+  // Validate token format (basic JWT structure check)
+  if (token && token.split('.').length === 3) {
+    return token;
+  }
+  
+  return null;
+};

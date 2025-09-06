@@ -1,8 +1,7 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import useConversation from "../zustand/useConversation.js";
 import axios from "axios";
-import Cookies from "js-cookie";
-import { getApiUrl } from "../utils/api";
+import { getApiUrl, getAuthToken } from "../utils/api";
 
 const useSendMessage = () => {
   const [loading, setLoading] = useState(false);
@@ -11,11 +10,7 @@ const useSendMessage = () => {
   const sendMessages = async (message) => {
     setLoading(true);
     try {
-      // Get token for authentication
-      let token = Cookies.get("jwt");
-      if (!token) {
-        token = localStorage.getItem("jwt");
-      }
+      const token = getAuthToken();
 
       const res = await axios.post(
         getApiUrl(`api/message/send/${selectedConversation._id}`),

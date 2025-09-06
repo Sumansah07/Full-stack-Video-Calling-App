@@ -4,17 +4,13 @@ import { BiLogOutCircle } from "react-icons/bi";
 import axios from "axios";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
-import { getApiUrl } from "../../utils/api";
+import { getApiUrl, getAuthToken } from "../../utils/api";
 function Logout() {
   const [loading, setLoading] = useState(false);
   const handleLogout = async () => {
     setLoading(true);
     try {
-      // Get token for authentication
-      let token = Cookies.get("jwt");
-      if (!token) {
-        token = localStorage.getItem("jwt");
-      }
+      const token = getAuthToken();
       
       const res = await axios.post(getApiUrl("api/user/logout"), {}, {
         withCredentials: true,

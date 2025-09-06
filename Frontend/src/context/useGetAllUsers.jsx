@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import Cookies from "js-cookie";
 import axios from "axios";
-import { getApiUrl } from "../utils/api";
+import { getApiUrl, getAuthToken } from "../utils/api";
 import { useSocketContext } from "./SocketContext";
 
 function useGetAllUsers() {
@@ -13,11 +12,7 @@ function useGetAllUsers() {
     const getUsers = async () => {
       setLoading(true);
       try {
-        // Try to get token from cookies first, then from localStorage
-        let token = Cookies.get("jwt");
-        if (!token) {
-          token = localStorage.getItem("jwt");
-        }
+        const token = getAuthToken();
         
         const response = await axios.get(getApiUrl("api/user/allusers"), {
           withCredentials: true,

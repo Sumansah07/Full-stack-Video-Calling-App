@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useState } from "react";
-import Cookies from "js-cookie";
 export const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
-  const initialUserState =
-    Cookies.get("jwt") || localStorage.getItem("ChatApp");
+  // Get user data from localStorage (not the JWT token)
+  const initialUserState = localStorage.getItem("ChatApp");
 
   // parse the user data and storing in state.
   const [authUser, setAuthUser] = useState(

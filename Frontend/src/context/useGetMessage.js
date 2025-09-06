@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import useConversation from "../zustand/useConversation.js";
 import axios from "axios";
-import Cookies from "js-cookie";
-import { getApiUrl } from "../utils/api";
+import { getApiUrl, getAuthToken } from "../utils/api";
 const useGetMessage = () => {
   const [loading, setLoading] = useState(false);
   const { messages, setMessage, selectedConversation } = useConversation();
@@ -12,11 +11,7 @@ const useGetMessage = () => {
       setLoading(true);
       if (selectedConversation && selectedConversation._id) {
         try {
-          // Get token for authentication
-          let token = Cookies.get("jwt");
-          if (!token) {
-            token = localStorage.getItem("jwt");
-          }
+          const token = getAuthToken();
           
           const res = await axios.get(
             getApiUrl(`api/message/get/${selectedConversation._id}`),
