@@ -22,8 +22,9 @@ function Typesend() {
             placeholder="Type here"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            className="border border-gray-700 rounded-xl outline-none mt-1 px-4 py-3 w-full"
+            className="border border-gray-700 rounded-xl outline-none mt-1 px-4 py-3 w-full text-black"
           />
+
         </div>
         <button>
           <IoSend className="text-3xl" />
